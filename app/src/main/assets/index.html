@@ -1,0 +1,988 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d12">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>TV Photos</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%233b4fc4'/%3E%3Cpath fill='white' d='M17 6H7c-.6 0-1 .4-1 1v10c0 .6.4 1 1 1h10c.6 0 1-.4 1-1V7c0-.6-.4-1-1-1zm-7.5 2.5a1.2 1.2 0 110 2.4 1.2 1.2 0 010-2.4zM7.5 16l2.5-3.2 1.8 2.2 2.4-3.1L16.5 16h-9z'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #0b0d12; --panel: #161a22; --line: #262c38; --text: #f2f4f8; --muted: #9aa3b2;
+    --accent: #6c8cff; --accent-ink: #0b0d12; --danger: #ff6b6b; --ok: #4ade80;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; } /* .bar and .row set display: flex, which would beat the attribute */
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { padding: env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 24px); }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+  header { position: sticky; top: 0; z-index: 5; background: rgba(11,13,18,.92);
+    backdrop-filter: saturate(140%) blur(8px); -webkit-backdrop-filter: saturate(140%) blur(8px);
+    border-bottom: 1px solid var(--line); }
+  .bar { display: flex; align-items: center; gap: 10px; padding: 12px 0; }
+  h1 { font-size: 20px; margin: 0; font-weight: 650; letter-spacing: .2px; }
+  .count { color: var(--muted); font-size: 14px; margin-left: 2px; white-space: nowrap; }
+  .subcount { color: var(--muted); font-size: 13px; margin: -6px 0 10px; }
+  body.selecting .subcount { display: none; }
+  h1, .bar button, .bar .btn { white-space: nowrap; }
+  .spacer { flex: 1; }
+  button, .btn { font: inherit; border: 0; border-radius: 999px; padding: 10px 16px; cursor: pointer;
+    background: var(--panel); color: var(--text); border: 1px solid var(--line); min-height: 44px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+  .primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 650; }
+  .danger { background: var(--danger); color: #fff; border-color: transparent; font-weight: 650; }
+  button:disabled { opacity: .45; cursor: default; }
+  .status { padding: 0 0 12px; font-size: 14px; color: var(--muted); display: none; }
+  .status.show { display: block; }
+  .progress { height: 4px; background: var(--line); border-radius: 4px; overflow: hidden; margin-top: 6px; }
+  .progress > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 12px; }
+  @media (min-width: 560px) { .grid { grid-template-columns: repeat(4, 1fr); } }
+  .tile { position: relative; aspect-ratio: 1; background: var(--panel); border-radius: 6px; overflow: hidden;
+    border: 0; padding: 0; min-height: 0; }
+  .tile img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .15s; }
+  .selecting .tile:not(.combo) img, .selecting .tile.combo .mini { transform: scale(.94); }
+  .tile .check { position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; border-radius: 50%;
+    border: 2px solid #fff; background: rgba(0,0,0,.35); display: none; }
+  .selecting .tile .check { display: block; }
+  .tile.on .check { background: var(--accent); border-color: var(--accent); }
+  .tile.on .check::after { content: ""; position: absolute; left: 6px; top: 2px; width: 6px; height: 11px;
+    border: solid var(--accent-ink); border-width: 0 2.5px 2.5px 0; transform: rotate(45deg); }
+  .tile:not(.combo).on img, .tile.combo.on .mini { transform: scale(.86); border-radius: 4px; }
+  .empty { text-align: center; color: var(--muted); padding: 56px 16px; border: 1px dashed var(--line);
+    border-radius: 14px; margin-top: 16px; display: none; }
+  .empty.show { display: block; }
+  section.settings { margin-top: 28px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: 4px 16px; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0;
+    border-bottom: 1px solid var(--line); }
+  .row:last-child { border-bottom: 0; }
+  select { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line);
+    border-radius: 10px; padding: 8px 10px; min-height: 40px; }
+  .switch { position: relative; width: 50px; height: 30px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch span { position: absolute; inset: 0; background: var(--line); border-radius: 30px; transition: .2s; }
+  .switch span::before { content: ""; position: absolute; width: 24px; height: 24px; left: 3px; top: 3px;
+    background: #fff; border-radius: 50%; transition: .2s; }
+  .switch input:checked + span { background: var(--accent); }
+  .switch input:checked + span::before { transform: translateX(20px); }
+  .row small { display: block; color: var(--muted); font-size: 13px; }
+  .row.note { color: var(--muted); font-size: 13px; }
+  .pin.small { font-size: 20px; letter-spacing: 6px; width: 96px; padding: 6px 0 6px 6px; }
+  .pinset { display: inline-flex; gap: 8px; align-items: center; flex: none; }
+  .row.shown { justify-content: center; font-size: 18px; }
+  .row.shown b { font-size: 28px; letter-spacing: 6px; color: var(--accent); }
+  input.text { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line);
+    border-radius: 10px; padding: 8px 10px; min-height: 40px; flex: 1; min-width: 0; }
+  #placeresults button { display: block; width: 100%; text-align: left; justify-content: flex-start;
+    border-radius: 10px; margin: 0 0 8px; }
+  #placeresults:not(:empty) { padding-top: 8px; }
+  .row.search { border-bottom: 0; }
+  section.settings button { white-space: nowrap; }
+  .foot { color: var(--muted); font-size: 13px; text-align: center; margin-top: 18px; }
+  /* PIN screen */
+  .login { min-height: 80vh; display: none; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; gap: 16px; padding: 24px; }
+  .login.show { display: flex; }
+  .login p { color: var(--muted); margin: 0; max-width: 320px; }
+  .pin { font-size: 32px; letter-spacing: 14px; text-align: center; width: 200px; padding: 10px 0 10px 14px;
+    border-radius: 14px; border: 1px solid var(--line); background: var(--panel); color: var(--text); }
+  .err { color: var(--danger); min-height: 1.4em; font-size: 14px; }
+  /* Sections, combinations, hidden */
+  .sec { font-size: 13px; font-weight: 650; color: var(--muted); text-transform: uppercase; letter-spacing: .6px;
+    margin: 18px 2px -4px; }
+  .grid.combos { grid-template-columns: repeat(2, 1fr); }
+  @media (min-width: 560px) { .grid.combos { grid-template-columns: repeat(3, 1fr); } }
+  .tile.combo { aspect-ratio: 16 / 9; background: #000; }
+  .mini { position: absolute; inset: 0; transition: transform .15s; overflow: hidden; }
+  .mini span { position: absolute; overflow: hidden; border: 1.5px solid #000; }
+  .tile.off img { opacity: .35; }
+  .tag { position: absolute; left: 6px; bottom: 6px; font-size: 11px; font-weight: 650; line-height: 1.5;
+    background: rgba(0,0,0,.7); color: #fff; padding: 1px 7px; border-radius: 999px; }
+  .selbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: flex; gap: 8px;
+    background: rgba(11,13,18,.96); border-top: 1px solid var(--line);
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }
+  .selbar button { flex: 1; padding: 10px 6px; }
+  body.selecting main { padding-bottom: 84px; }
+  /* Editor: the TV's 16:9 frame over the photo; what falls outside it is dimmed */
+  .editor { position: fixed; inset: 0; background: #000; z-index: 20; display: none; flex-direction: column; }
+  .editor.show { display: flex; }
+  .edtop { display: flex; align-items: center; gap: 10px; padding: calc(10px + env(safe-area-inset-top)) 16px 10px; }
+  .edtop h2 { flex: 1; font-size: 17px; margin: 0; text-align: center; font-weight: 650; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+  .stage { position: relative; flex: 1; min-height: 0; overflow: hidden; touch-action: none; user-select: none;
+    -webkit-user-select: none; cursor: grab; }
+  .stage img { position: absolute; max-width: none; pointer-events: none; -webkit-user-drag: none; visibility: hidden; }
+  .stage .ghost { opacity: .3; }
+  .frame { position: absolute; background: #000; outline: 2px solid rgba(255,255,255,.92); }
+  .box { position: absolute; overflow: hidden; background: #15181f; }
+  .box.sel::after { content: ""; position: absolute; inset: 0; border: 3px solid var(--accent); pointer-events: none; }
+  .controls { background: var(--bg); border-top: 1px solid var(--line);
+    padding: 0 16px calc(8px + env(safe-area-inset-bottom)); }
+  .controls .hint { color: var(--muted); font-size: 13px; text-align: center; padding: 10px 0 0; }
+  .controls input[type=range] { flex: 1; accent-color: var(--accent); min-width: 0; }
+  .seg { justify-content: center; }
+  .seg button { flex: 1; }
+  .seg button.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 650; }
+  /* Playlists */
+  .chips { display: flex; gap: 8px; overflow-x: auto; padding: 14px 2px 2px; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { flex: none; min-height: 38px; padding: 7px 14px; font-size: 15px; }
+  .chip.on { background: var(--text); color: var(--bg); border-color: transparent; font-weight: 650; }
+  .chip .n { opacity: .6; font-size: 13px; }
+  .chip .pl { color: var(--accent); font-size: 11px; }
+  .chip.on .pl { color: #3b4fc4; }
+  .playing { color: var(--muted); font-size: 13px; margin: 8px 2px 0; }
+  .plbar { margin-top: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 4px 16px; }
+  .plbar .acts { justify-content: flex-start; }
+  /* Sheets: Add to…, and a photo's actions on the TV */
+  .sheet { position: fixed; inset: 0; z-index: 25; background: rgba(0,0,0,.6); display: flex; align-items: flex-end;
+    justify-content: center; }
+  .sheetbox { background: var(--panel); border: 1px solid var(--line); border-radius: 18px 18px 0 0; width: 100%;
+    max-width: 520px; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); display: flex;
+    flex-direction: column; gap: 8px; max-height: 85vh; overflow-y: auto; }
+  .sheetbox h3 { margin: 0 0 4px; font-size: 17px; text-align: center; }
+  .sheetbox button { width: 100%; flex: none; }
+  .sheetbox .note { color: var(--muted); font-size: 13px; text-align: center; }
+  .preview { position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: 8px; overflow: hidden; flex: none; }
+  .preview > img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  /* The TV view (?tv=1, inside the TV Photos app): wider, and moved around with the remote's arrows */
+  body.tv .wrap { max-width: none; padding: 0 28px; }
+  body.tv .grid { grid-template-columns: repeat(6, 1fr); gap: 8px; }
+  body.tv .grid.combos { grid-template-columns: repeat(4, 1fr); }
+  body.tv label.btn[for=files], body.tv #combine { display: none; }
+  body.tv :focus { outline: 3px solid #fff; outline-offset: 2px; }
+  body.tv .tile:focus { outline: 4px solid #fff; outline-offset: 2px; z-index: 1; }
+  body.tv .switch input:focus + span { outline: 3px solid #fff; outline-offset: 3px; }
+  body.tv .sheet { align-items: center; }
+  body.tv .sheetbox { border-radius: 18px; max-width: 440px; padding: 14px; }
+  body.tv .preview { width: 50%; align-self: center; }
+  body.tv .selbar { position: static; background: none; border: 0; padding: 0; flex: 1; justify-content: flex-end; }
+  body.tv .selbar button { flex: none; padding: 10px 16px; }
+  body.tv.selecting main { padding-bottom: 0; }
+  main.hide, header.hide { display: none; }
+  .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+    background: #fff; color: #000; padding: 10px 16px; border-radius: 999px; font-size: 14px; z-index: 30;
+    opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw; text-align: center; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="login" id="login">
+  <h1>TV Photos</h1>
+  <p>Enter your 4-digit PIN. First time, or forgot it? On the TV, open TV Photos and choose New random PIN.</p>
+  <input class="pin" id="pin" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" aria-label="PIN">
+  <button class="primary" id="go">Continue</button>
+  <div class="err" id="err"></div>
+</div>
+
+<header id="header" class="hide">
+  <div class="wrap">
+    <div class="bar" id="bar-normal">
+      <h1>TV Photos</h1>
+      <span class="spacer"></span>
+      <button id="select">Select</button>
+      <label class="btn primary" for="files">+ Add</label>
+      <input id="files" type="file" accept="image/*" multiple hidden>
+    </div>
+    <div class="subcount" id="count"></div>
+    <div class="bar" id="bar-select" hidden>
+      <button id="cancel">Cancel</button>
+      <span class="count" id="selcount">0 selected</span>
+      <span class="spacer"></span>
+    </div>
+    <div class="status" id="status"><span id="statustext"></span><div class="progress"><i id="bar"></i></div></div>
+  </div>
+</header>
+
+<main id="main" class="hide">
+  <div class="wrap">
+    <div class="chips" id="chips"></div>
+    <div class="playing" id="playing"></div>
+    <div class="plbar" id="plbar" hidden>
+      <div class="row">
+        <span>Play on the TV<small id="plinfo"></small></span>
+        <label class="switch"><input type="checkbox" id="plplay"><span></span></label>
+      </div>
+      <div class="row acts"><button id="plrename">Rename</button><button class="danger" id="pldelete">Delete playlist</button></div>
+    </div>
+    <h2 class="sec" id="combohead" hidden>Combinations</h2>
+    <div class="grid combos" id="combogrid"></div>
+    <h2 class="sec" id="photohead" hidden>Photos</h2>
+    <div class="grid" id="grid"></div>
+    <div class="empty" id="empty"></div>
+    <section class="settings">
+      <div class="row">
+        <span>Change photo every</span>
+        <select id="interval">
+          <option value="10">10 seconds</option><option value="30">30 seconds</option>
+          <option value="60">1 minute</option><option value="180">3 minutes</option>
+          <option value="300">5 minutes</option><option value="600">10 minutes</option>
+        </select>
+      </div>
+      <div class="row">
+        <span>Show the clock</span>
+        <label class="switch"><input type="checkbox" id="clock"><span></span></label>
+      </div>
+      <div class="row">
+        <span>Fill the screen<small>Crops photos so there are no black bars</small></span>
+        <label class="switch"><input type="checkbox" id="fill"><span></span></label>
+      </div>
+      <div class="row">
+        <span>QR code on the screensaver<small>Scan it to open this page</small></span>
+        <label class="switch"><input type="checkbox" id="qr"><span></span></label>
+      </div>
+    </section>
+    <section class="settings">
+      <div class="row">
+        <span>Weather<small id="placename">No town set</small></span>
+        <label class="switch"><input type="checkbox" id="weather"><span></span></label>
+      </div>
+      <div class="row search">
+        <input class="text" id="placeq" placeholder="Change town" autocomplete="off" aria-label="Town">
+        <button id="placesearch">Search</button>
+      </div>
+      <div id="placeresults"></div>
+    </section>
+    <section class="settings">
+      <div class="row">
+        <span>Change PIN<small>Choose your own 4 digits</small></span>
+        <span class="pinset">
+          <input class="pin small" id="pinval" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" aria-label="New PIN">
+          <button class="primary" id="savepin">Save</button>
+        </span>
+      </div>
+      <div class="row">
+        <span>Forgot it?<small>Makes a new PIN and shows it once</small></span>
+        <button id="randompin">New random PIN</button>
+      </div>
+      <div class="row shown" id="shown" hidden>New PIN&nbsp;<b id="shownpin"></b></div>
+      <div class="row note">Changing the PIN signs out every other phone.</div>
+    </section>
+    <div class="foot" id="foot"></div>
+  </div>
+</main>
+
+<div class="selbar" id="selbar" hidden>
+  <button id="combine" disabled>Combine</button>
+  <button id="hideshow" disabled>Hide</button>
+  <button id="addto" disabled>Add to…</button>
+  <button id="remove" disabled hidden>Remove</button>
+  <button class="danger" id="delete" disabled>Delete</button>
+</div>
+<div class="sheet" id="sheet" hidden><div class="sheetbox" id="sheetbox"></div></div>
+
+<div class="editor" id="editor">
+  <div class="edtop">
+    <button id="edclose">Close</button>
+    <h2 id="edtitle"></h2>
+    <button class="primary" id="save">Save</button>
+  </div>
+  <div class="stage" id="stage"></div>
+  <div class="controls">
+    <div class="hint" id="edhint"></div>
+    <div class="row"><span>Zoom</span><input type="range" id="zoom" min="0.5" max="4" step="0.01" aria-label="Zoom"></div>
+    <div class="row seg" id="layouts">
+      <button data-layout="row3">3 in a row</button><button data-layout="big3">1 big + 2 small</button>
+    </div>
+    <div class="row">
+      <span><button id="reset">Reset</button><button id="swap">&#8644; Swap photos</button></span>
+      <button class="danger" id="eddelete">Delete</button>
+    </div>
+    <div class="row" id="showrow">
+      <span>Show on TV<small>Off keeps it stored, just not shown</small></span>
+      <label class="switch"><input type="checkbox" id="edshow"><span></span></label>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+let photos = [], meta = {}, combos = [], fillDefault = true;
+let selecting = false, selected = new Set(), ed = null;
+let playlists = [], view = null; // view: the playlist shown, or null for All
+const TV = new URLSearchParams(location.search).has('tv'); // inside the TV Photos app on the TV
+const isPhoto = key => key.endsWith('.jpg');
+const plural = (n, word) => n + '\u00a0' + word + (n === 1 ? '' : 's'); // no break inside "2 combinations"
+const form = o => Object.entries(o).map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&');
+const post = (path, o) => api(path, { method: 'POST',
+  headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form(o) });
+const quiet = e => { if (e.message !== 'PIN needed') toast(e.message); };
+
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2600);
+}
+function showLogin(msg) {
+  $('login').classList.add('show'); $('header').classList.add('hide'); $('main').classList.add('hide');
+  $('err').textContent = msg || ''; $('pin').value = ''; setTimeout(() => $('pin').focus(), 50);
+}
+function showApp() {
+  $('login').classList.remove('show'); $('header').classList.remove('hide'); $('main').classList.remove('hide');
+}
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (r.status === 401) { showLogin(); throw new Error('PIN needed'); }
+  let body = {}; try { body = await r.json(); } catch (e) {}
+  if (!r.ok) throw new Error(body.error || ('The TV answered ' + r.status));
+  return body;
+}
+
+async function load() {
+  let data;
+  try { data = await api('/api/photos'); } catch (e) { if (e.message !== 'PIN needed') toast(e.message); return; }
+  showApp();
+  photos = data.photos; meta = data.meta || {}; combos = data.combos || []; fillDefault = !!data.fill;
+  playlists = data.playlists || [];
+  if (view && !playlists.some(p => p.id === view)) view = null;
+  $('interval').value = String(data.interval);
+  $('clock').checked = !!data.clock;
+  $('fill').checked = !!data.fill;
+  $('qr').checked = !!data.qr;
+  $('weather').checked = !!data.weather;
+  $('placename').textContent = data.place ? 'Forecast for ' + data.place : 'No town set';
+  $('foot').textContent = 'Space left on the TV: ' + (data.free / 1e9).toFixed(1) + ' GB';
+  render();
+  if (TV && (!document.activeElement || document.activeElement === document.body)) focusFirstChip();
+}
+function render() {
+  // On the TV, re-drawing must not lose the remote's place.
+  const fk = TV && document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.k : null;
+  const pl = current(), only = pl ? new Set(pl.items) : null;
+  const shownCombos = only ? combos.filter(c => only.has(c.id)) : combos;
+  const shownPhotos = only ? photos.filter(n => only.has(n)) : photos;
+  const hidden = photos.filter(n => meta[n] && meta[n].off).length + combos.filter(c => c.off).length;
+  const parts = [plural(photos.length, 'photo')];
+  if (combos.length) parts.push(plural(combos.length, 'combination'));
+  if (hidden) parts.push(hidden + '\u00a0hidden');
+  $('count').textContent = parts.join(' · ');
+  const nothing = shownPhotos.length + shownCombos.length === 0;
+  $('empty').classList.toggle('show', nothing);
+  $('empty').textContent = !pl ? (TV ? 'No photos on the TV yet. Add some from your phone.'
+      : 'No photos on the TV yet. Tap + Add to pick some from this phone.')
+    : TV ? 'Nothing in ' + pl.name + ' yet. Go to All, choose Select, pick photos, then Add to…'
+    : 'Nothing in ' + pl.name + ' yet. Tap + Add to send photos straight into it, or go to All, tap Select, pick photos, then Add to…';
+  $('select').disabled = nothing;
+  $('combohead').hidden = $('photohead').hidden = shownCombos.length === 0;
+  const cg = $('combogrid'); cg.replaceChildren();
+  for (const c of shownCombos) cg.append(tile(c.id, c.off, comboMini(c), () => TV ? tvSheet(c.id) : openCombo(c, false)));
+  const grid = $('grid'); grid.replaceChildren();
+  for (const name of shownPhotos) {
+    const img = document.createElement('img'); img.loading = 'lazy'; img.alt = ''; img.src = '/thumb/' + name;
+    grid.append(tile(name, meta[name] && meta[name].off, img, () => TV ? tvSheet(name) : openPhoto(name)));
+  }
+  document.body.classList.toggle('selecting', selecting);
+  renderChips(); renderPlaying(); renderPlaylistBar();
+  if (fk) { const el = document.querySelector('[data-k="' + CSS.escape(fk) + '"]'); if (el) el.focus({ preventScroll: true }); }
+}
+function tile(key, off, content, onOpen) {
+  const b = document.createElement('button'); b.dataset.k = 'tile:' + key;
+  b.className = 'tile' + (isPhoto(key) ? '' : ' combo') + (off ? ' off' : '') + (selected.has(key) ? ' on' : '');
+  const check = document.createElement('span'); check.className = 'check';
+  b.append(content, check);
+  if (off) { const t = document.createElement('span'); t.className = 'tag'; t.textContent = 'Hidden'; b.append(t); }
+  b.onclick = () => selecting ? toggle(key, b) : onOpen();
+  return b;
+}
+/** A combination's tile: its layout, with the square thumbnails in the boxes. */
+function comboMini(c) {
+  const m = document.createElement('span'); m.className = 'mini';
+  BOXES[c.layout].forEach((f, i) => {
+    const s = document.createElement('span');
+    s.style.cssText = `left:${f[0] * 100}%;top:${f[1] * 100}%;width:${f[2] * 100}%;height:${f[3] * 100}%`;
+    const img = document.createElement('img'); img.loading = 'lazy'; img.alt = ''; img.src = '/thumb/' + c.cells[i].p;
+    s.append(img); m.append(s);
+  });
+  return m;
+}
+
+// ---- Selecting: combine, hide or show, delete ----
+function setSelecting(on) {
+  selecting = on; selected.clear();
+  $('bar-normal').hidden = on; $('bar-select').hidden = !on; $('selbar').hidden = !on;
+  updateSel(); render();
+}
+function toggle(key, el) {
+  selected.has(key) ? selected.delete(key) : selected.add(key);
+  el.classList.toggle('on', selected.has(key)); updateSel();
+}
+function selParts() {
+  const keys = [...selected];
+  return { names: keys.filter(isPhoto), ids: keys.filter(k => !isPhoto(k)) };
+}
+function isOff(key) {
+  if (isPhoto(key)) return !!(meta[key] && meta[key].off);
+  const c = combos.find(x => x.id === key); return !!(c && c.off);
+}
+function updateSel() {
+  const { names, ids } = selParts(), n = selected.size;
+  $('selcount').textContent = n + ' selected';
+  $('combine').disabled = ids.length > 0 || names.length < 2 || names.length > 4;
+  $('hideshow').textContent = n > 0 && [...selected].every(isOff) ? 'Show' : 'Hide';
+  $('hideshow').disabled = n === 0;
+  $('delete').disabled = n === 0;
+  $('addto').hidden = !!view; $('remove').hidden = !view;
+  $('addto').disabled = $('remove').disabled = n === 0;
+}
+async function setShown(names, ids, on) {
+  await post('/api/show', { on: on ? 1 : 0, names: names.join(','), combos: ids.join(',') });
+  for (const n of names) {
+    meta[n] = Object.assign({}, meta[n]);
+    if (on) delete meta[n].off; else meta[n].off = true;
+  }
+  for (const c of combos) if (ids.includes(c.id)) c.off = !on;
+}
+async function removeItems(names, ids) {
+  const lost = combos.filter(c => !ids.includes(c.id) && c.cells.some(x => names.includes(x.p))).length;
+  const what = [];
+  if (names.length) what.push(names.length === 1 ? 'this photo' : names.length + ' photos');
+  if (ids.length) what.push(ids.length === 1 ? 'this combination' : ids.length + ' combinations');
+  let msg = 'Delete ' + what.join(' and ') + ' from the TV?';
+  const them = names.length === 1 ? 'it' : 'them';
+  if (lost === 1) msg += ' 1 combination uses ' + them + ' and is deleted too.';
+  if (lost > 1) msg += ' ' + lost + ' combinations use ' + them + ' and are deleted too.';
+  msg += names.length ? ' The copies on your phone are not touched.'
+    : ' The photos in ' + (ids.length === 1 ? 'it' : 'them') + ' stay on the TV.';
+  if (!confirm(msg)) return false;
+  try {
+    for (const id of ids) await post('/api/combo/delete', { id });
+    if (names.length) await api('/api/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ names }) });
+    toast('Deleted');
+  } catch (e) { quiet(e); }
+  load();
+  return true;
+}
+$('select').onclick = () => setSelecting(true);
+$('cancel').onclick = () => setSelecting(false);
+$('delete').onclick = async () => { const { names, ids } = selParts(); if (await removeItems(names, ids)) setSelecting(false); };
+$('hideshow').onclick = async () => {
+  const { names, ids } = selParts(), on = $('hideshow').textContent === 'Show';
+  try { await setShown(names, ids, on); toast(on ? 'Showing on the TV again' : 'Hidden from the TV. Still stored there.'); }
+  catch (e) { quiet(e); }
+  setSelecting(false);
+};
+$('addto').onclick = () => { const { names, ids } = selParts(); addToSheet(names, ids); };
+$('remove').onclick = async () => {
+  const pl = current(), { names, ids } = selParts();
+  try {
+    await post('/api/playlist/items', { id: pl.id, add: 0, names: names.join(','), combos: ids.join(',') });
+    toast('Removed from ' + pl.name + '. Still on the TV.');
+  } catch (e) { quiet(e); }
+  setSelecting(false); load();
+};
+
+// ---- Playlists ----
+function current() { return view ? playlists.find(p => p.id === view) || null : null; }
+function showView(id) { view = id; if (selecting) setSelecting(false); else render(); }
+function renderChips() {
+  const box = $('chips'); box.replaceChildren();
+  const chip = (k, label, n, on, playing, onClick) => {
+    const b = document.createElement('button'); b.className = 'chip' + (on ? ' on' : ''); b.dataset.k = 'chip:' + k;
+    b.append(label);
+    if (n != null) { const s = document.createElement('span'); s.className = 'n'; s.textContent = ' ' + n; b.append(s); }
+    if (playing) { const s = document.createElement('span'); s.className = 'pl'; s.textContent = ' ▶'; s.title = 'Plays on the TV'; b.append(s); }
+    b.onclick = onClick; box.append(b);
+  };
+  chip('all', 'All', null, !view, false, () => showView(null));
+  for (const p of playlists) chip(p.id, p.name, p.items.length, view === p.id, p.on, () => showView(p.id));
+  chip('new', '+ New', null, false, false, async () => { const id = await newPlaylist(); if (id) showView(id); });
+}
+function renderPlaying() {
+  const on = playlists.filter(p => p.on);
+  let text = 'Playing on the TV: all photos';
+  if (on.length) {
+    const something = on.some(p => p.items.some(k => !isOff(k)));
+    text = 'Playing on the TV: ' + on.map(p => p.name).join(', ')
+      + (something ? '' : ' (nothing to show yet, so all photos play)');
+  }
+  $('playing').textContent = text;
+}
+function renderPlaylistBar() {
+  const pl = current(); $('plbar').hidden = !pl;
+  if (!pl) return;
+  $('plplay').checked = pl.on;
+  const others = playlists.filter(p => p.on && p.id !== pl.id).map(p => p.name);
+  $('plinfo').textContent = !pl.on ? 'Off: the screensaver skips it'
+    : others.length ? 'On, mixed with ' + others.join(', ') : 'On: the screensaver plays only this';
+}
+async function newPlaylist() {
+  const name = (prompt('Name of the new playlist, e.g. Italy') || '').trim();
+  if (!name) return null;
+  try { const r = await post('/api/playlist', { name }); await load(); return r.id; }
+  catch (e) { quiet(e); return null; }
+}
+$('plplay').onchange = async e => {
+  const pl = current(), on = e.target.checked;
+  try {
+    await post('/api/playlist/play', { id: pl.id, on: on ? 1 : 0 });
+    pl.on = on; render();
+    toast(on ? pl.name + ' plays on the TV' : pl.name + ' no longer plays');
+  } catch (err) { e.target.checked = !on; quiet(err); }
+};
+$('plrename').onclick = async () => {
+  const pl = current(), name = (prompt('New name for ' + pl.name, pl.name) || '').trim();
+  if (!name || name === pl.name) return;
+  try { await post('/api/playlist', { id: pl.id, name }); toast('Renamed'); load(); } catch (e) { quiet(e); }
+};
+$('pldelete').onclick = async () => {
+  const pl = current();
+  if (!confirm('Delete the playlist "' + pl.name + '"? Its photos stay on the TV.')) return;
+  try { await post('/api/playlist/delete', { id: pl.id }); toast('Playlist deleted'); view = null; load(); if (TV) focusFirstChip(); }
+  catch (e) { quiet(e); }
+};
+function what(names, ids) {
+  if (!ids.length) return names.length === 1 ? 'this photo' : names.length + ' photos';
+  if (!names.length) return ids.length === 1 ? 'this combination' : ids.length + ' combinations';
+  return (names.length + ids.length) + ' items';
+}
+function addToSheet(names, ids) {
+  const items = playlists.map(p => ({ label: p.name, onClick: () => addTo(p, names, ids) }));
+  items.push({ label: '+ New playlist…', onClick: async () => {
+    const id = await newPlaylist(); const p = id && playlists.find(x => x.id === id);
+    if (p) addTo(p, names, ids);
+  } });
+  openSheet('Add ' + what(names, ids) + ' to', items);
+}
+async function addTo(p, names, ids) {
+  closeSheet();
+  try {
+    const r = await post('/api/playlist/items', { id: p.id, add: 1, names: names.join(','), combos: ids.join(',') });
+    toast(r.changed ? 'Added to ' + p.name : 'Already in ' + p.name);
+  } catch (e) { quiet(e); }
+  if (selecting) setSelecting(false);
+  load();
+}
+
+// ---- Sheets ----
+let sheetReturn = null;
+function openSheet(title, items, top) {
+  sheetReturn = document.activeElement;
+  const box = $('sheetbox'); box.replaceChildren();
+  if (top) box.append(top);
+  const h = document.createElement('h3'); h.textContent = title; box.append(h);
+  for (const it of items) {
+    if (it.note) { const d = document.createElement('div'); d.className = 'note'; d.textContent = it.note; box.append(d); continue; }
+    const b = document.createElement('button'); b.textContent = it.label; if (it.cls) b.className = it.cls;
+    b.onclick = it.onClick; box.append(b);
+  }
+  const c = document.createElement('button'); c.textContent = 'Cancel'; c.onclick = closeSheet; box.append(c);
+  $('sheet').hidden = false;
+  if (TV) box.querySelector('button').focus();
+}
+function closeSheet() {
+  $('sheet').hidden = true; $('sheetbox').replaceChildren();
+  if (TV && sheetReturn && document.contains(sheetReturn)) sheetReturn.focus({ preventScroll: true });
+}
+$('sheet').onclick = e => { if (e.target === $('sheet')) closeSheet(); };
+/** On the TV a photo or combination opens this instead of the editor: framing needs a finger. */
+function tvSheet(key) {
+  const photo = isPhoto(key), pl = current(), off = isOff(key);
+  const names = photo ? [key] : [], ids = photo ? [] : [key];
+  const top = document.createElement('div'); top.className = 'preview';
+  if (photo) { const img = document.createElement('img'); img.alt = ''; img.src = '/photo/' + key; top.append(img); }
+  else top.append(comboMini(combos.find(c => c.id === key)));
+  const items = [{ label: off ? 'Show on the TV' : 'Hide from the TV', onClick: async () => {
+    closeSheet();
+    try { await setShown(names, ids, off); render(); toast(off ? 'Showing on the TV again' : 'Hidden from the TV. Still stored there.'); }
+    catch (e) { quiet(e); }
+  } }, { label: 'Add to playlist…', onClick: () => addToSheet(names, ids) }];
+  if (pl) items.push({ label: 'Remove from ' + pl.name, onClick: async () => {
+    closeSheet();
+    try { await post('/api/playlist/items', { id: pl.id, add: 0, names: names.join(','), combos: ids.join(',') }); toast('Removed from ' + pl.name); }
+    catch (e) { quiet(e); }
+    load();
+  } });
+  items.push({ label: 'Delete from the TV', cls: 'danger', onClick: () => { closeSheet(); removeItems(names, ids); } });
+  items.push({ note: 'To frame or combine photos, use your phone.' });
+  openSheet(photo ? 'Photo' : 'Combination', items, top);
+}
+
+$('combine').onclick = () => {
+  const { names } = selParts(); // in the order they were picked: the first goes in the first (big) box
+  openCombo({ layout: names.length === 2 ? 'pair' : names.length === 3 ? 'row3' : 'grid4', off: false,
+    cells: names.map(p => ({ p, x: .5, y: .5, z: 1 })) }, true);
+};
+
+// ---- Framing: the same maths as Framing.java on the TV ----
+const SCREEN = 16 / 9, MAX_ZOOM = 4;
+const BOXES = {
+  pair: [[0, 0, .5, 1], [.5, 0, .5, 1]],
+  row3: [[0, 0, 1 / 3, 1], [1 / 3, 0, 1 / 3, 1], [2 / 3, 0, 1 / 3, 1]],
+  big3: [[0, 0, 2 / 3, 1], [2 / 3, 0, 1 / 3, .5], [2 / 3, .5, 1 / 3, .5]],
+  grid4: [[0, 0, .5, .5], [.5, 0, .5, .5], [0, .5, .5, .5], [.5, .5, .5, .5]],
+};
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+function fitZoom(w, h, pw, ph) { return Math.min(w / pw, h / ph) / Math.max(w / pw, h / ph); }
+/** Where a pw x ph photo sits in a w x h box for framing {x, y, z}; z comes back clamped. */
+function place(w, h, pw, ph, x, y, z) {
+  const cover = Math.max(w / pw, h / ph);
+  z = Math.max(fitZoom(w, h, pw, ph), Math.min(MAX_ZOOM, z));
+  const s = cover * z, dw = pw * s, dh = ph * s;
+  const left = dw >= w ? clamp(w / 2 - x * dw, w - dw, 0) : (w - dw) / 2;
+  const top = dh >= h ? clamp(h / 2 - y * dh, h - dh, 0) : (h - dh) / 2;
+  return { left, top, dw, dh, z };
+}
+/** The layout's boxes in pixels [left, top, width, height], with the TV's gap between them. */
+function pixelBoxes(layout, W, H) {
+  const f = BOXES[layout]; if (!f) return [[0, 0, W, H]];
+  const half = Math.max(1, 4 * W / 1920);
+  return f.map(([fx, fy, fw, fh]) => {
+    let l = fx * W, t = fy * H, r = (fx + fw) * W, b = (fy + fh) * H;
+    if (l > .01) l += half; if (t > .01) t += half; if (r < W - .01) r -= half; if (b < H - .01) b -= half;
+    return [l, t, r - l, b - t];
+  });
+}
+
+// ---- Editor: a photo's framing, or a combination ----
+function openPhoto(name) {
+  const m = meta[name] || {}, framed = m.z != null;
+  ed = { kind: 'photo', key: name, layout: null, off: !!m.off, isNew: false, dirty: false, reset: false, sel: 0,
+    cells: [{ p: name, x: framed ? m.x : .5, y: framed ? m.y : .5, z: framed ? m.z : null }] };
+  openEditor();
+}
+function openCombo(c, isNew) {
+  ed = { kind: 'combo', key: c.id || null, layout: c.layout, off: !!c.off, isNew, dirty: isNew, reset: false, sel: 0,
+    cells: c.cells.map(x => ({ ...x })) };
+  openEditor();
+}
+function openEditor() {
+  const photo = ed.kind === 'photo';
+  $('edtitle').textContent = photo ? 'On the TV' : ed.isNew ? 'New combination' : 'Combination';
+  $('edhint').textContent = photo ? 'Drag to move · pinch or slide to zoom' : 'Tap a box, then drag to move · pinch to zoom';
+  $('reset').hidden = !photo; $('swap').hidden = photo;
+  $('layouts').hidden = photo || ed.cells.length !== 3;
+  $('showrow').hidden = ed.isNew; $('edshow').checked = !ed.off;
+  $('eddelete').hidden = ed.isNew;
+  const stage = $('stage'); stage.replaceChildren();
+  ed.sizes = {}; ed.boxEls = []; ed.imgEls = []; ed.ghost = null;
+  if (photo) { ed.ghost = document.createElement('img'); ed.ghost.className = 'ghost'; ed.ghost.alt = ''; stage.append(ed.ghost); }
+  ed.frame = document.createElement('div'); ed.frame.className = 'frame'; stage.append(ed.frame);
+  ed.cells.forEach(() => {
+    const box = document.createElement('div'); box.className = 'box';
+    const img = document.createElement('img'); img.alt = '';
+    box.append(img); ed.frame.append(box); ed.boxEls.push(box); ed.imgEls.push(img);
+  });
+  ed.cells.forEach((c, i) => setCellImage(i));
+  $('editor').classList.add('show');
+  history.pushState({ editor: 1 }, '');
+  markSel(); layoutButtons(); requestAnimationFrame(draw);
+}
+function setCellImage(i) {
+  const p = ed.cells[i].p, img = ed.imgEls[i], mine = ed;
+  img.src = '/photo/' + p;
+  if (i === 0 && ed.ghost) ed.ghost.src = img.src;
+  if (ed.sizes[p]) return;
+  const probe = new Image();
+  probe.onload = () => { if (mine !== ed) return; ed.sizes[p] = { w: probe.naturalWidth, h: probe.naturalHeight }; draw(); };
+  probe.src = '/photo/' + p;
+}
+/** Clamps a box's framing to what the TV can show, so dragging past an edge never sticks. */
+function normalize(i) {
+  const c = ed.cells[i], sz = ed.sizes[c.p], b = ed.boxes && ed.boxes[i];
+  if (!sz || !b) return null;
+  if (c.z == null) { // no framing of its own: the TV's default (Fill the screen, or whole when Fill is off)
+    c.z = fillDefault || Math.abs(sz.w / sz.h / SCREEN - 1) < .2 ? 1 : 0;
+  }
+  const p = place(b[2], b[3], sz.w, sz.h, c.x, c.y, c.z);
+  c.z = p.z;
+  c.x = p.dw > b[2] + .5 ? (b[2] / 2 - p.left) / p.dw : .5;
+  c.y = p.dh > b[3] + .5 ? (b[3] / 2 - p.top) / p.dh : .5;
+  return p;
+}
+function pos(el, l, t, w, h) { el.style.left = l + 'px'; el.style.top = t + 'px'; el.style.width = w + 'px'; el.style.height = h + 'px'; }
+function draw() {
+  if (!ed) return;
+  const st = $('stage'), SW = st.clientWidth, SH = st.clientHeight;
+  if (!SW || !SH) return;
+  const fw = Math.min(SW - 32, (SH - 32) * SCREEN), fh = fw / SCREEN, fl = (SW - fw) / 2, ft = (SH - fh) / 2;
+  ed.boxes = pixelBoxes(ed.layout, fw, fh);
+  pos(ed.frame, fl, ft, fw, fh);
+  ed.cells.forEach((c, i) => {
+    const b = ed.boxes[i]; pos(ed.boxEls[i], b[0], b[1], b[2], b[3]);
+    const p = normalize(i), img = ed.imgEls[i];
+    if (!p) return;
+    pos(img, p.left, p.top, p.dw, p.dh); img.style.visibility = 'visible';
+    if (i === 0 && ed.ghost) { pos(ed.ghost, fl + b[0] + p.left, ft + b[1] + p.top, p.dw, p.dh); ed.ghost.style.visibility = 'visible'; }
+  });
+  const c = ed.cells[ed.sel], sz = ed.sizes[c.p], b = ed.boxes[ed.sel], zoom = $('zoom');
+  zoom.disabled = !sz;
+  if (sz) { zoom.min = fitZoom(b[2], b[3], sz.w, sz.h).toFixed(3); zoom.value = c.z; }
+}
+function markSel() { ed.boxEls.forEach((b, i) => b.classList.toggle('sel', ed.kind === 'combo' && i === ed.sel)); }
+function layoutButtons() { for (const b of $('layouts').querySelectorAll('button')) b.classList.toggle('on', b.dataset.layout === ed.layout); }
+function touched() { ed.dirty = true; ed.reset = false; }
+
+// Gestures: one finger drags, two fingers pinch (and drag); a mouse drags and its wheel zooms.
+const pts = new Map(); let last = null;
+const mid = ps => ({ x: ps.reduce((s, p) => s + p.x, 0) / ps.length, y: ps.reduce((s, p) => s + p.y, 0) / ps.length });
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+function gestureStart() { const ps = [...pts.values()]; last = { mid: mid(ps), d: ps.length > 1 ? dist(ps[0], ps[1]) : 0 }; }
+function boxAt(x, y) {
+  const r = ed.frame.getBoundingClientRect(), fx = x - r.left, fy = y - r.top;
+  return ed.boxes.findIndex(b => fx >= b[0] && fx <= b[0] + b[2] && fy >= b[1] && fy <= b[1] + b[3]);
+}
+$('stage').addEventListener('pointerdown', e => {
+  if (!ed || !ed.boxes) return;
+  $('stage').setPointerCapture(e.pointerId);
+  pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pts.size === 1 && ed.kind === 'combo') {
+    const i = boxAt(e.clientX, e.clientY);
+    if (i >= 0 && i !== ed.sel) { ed.sel = i; markSel(); draw(); }
+  }
+  gestureStart();
+});
+$('stage').addEventListener('pointermove', e => {
+  if (!ed || !pts.has(e.pointerId)) return;
+  pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  const ps = [...pts.values()], m = mid(ps), i = ed.sel, c = ed.cells[i], sz = ed.sizes[c.p], b = ed.boxes[i];
+  if (!sz) return;
+  if (ps.length > 1) { const d = dist(ps[0], ps[1]); if (last.d > 0) c.z *= d / last.d; last.d = d; }
+  const p = place(b[2], b[3], sz.w, sz.h, c.x, c.y, c.z);
+  c.x -= (m.x - last.mid.x) / p.dw; c.y -= (m.y - last.mid.y) / p.dh; last.mid = m;
+  touched(); draw();
+});
+const lift = e => { pts.delete(e.pointerId); if (pts.size) gestureStart(); };
+$('stage').addEventListener('pointerup', lift);
+$('stage').addEventListener('pointercancel', lift);
+$('stage').addEventListener('wheel', e => {
+  if (!ed || !ed.sizes[ed.cells[ed.sel].p]) return;
+  e.preventDefault(); ed.cells[ed.sel].z *= Math.exp(-e.deltaY / 400); touched(); draw();
+}, { passive: false });
+$('zoom').oninput = e => { ed.cells[ed.sel].z = +e.target.value; touched(); draw(); };
+$('reset').onclick = () => { const c = ed.cells[0]; c.x = .5; c.y = .5; c.z = null; draw(); ed.dirty = true; ed.reset = true; };
+$('swap').onclick = () => { ed.cells.unshift(ed.cells.pop()); ed.cells.forEach((c, i) => setCellImage(i)); touched(); draw(); };
+for (const b of $('layouts').querySelectorAll('button')) {
+  b.onclick = () => { ed.layout = b.dataset.layout; touched(); layoutButtons(); draw(); };
+}
+$('save').onclick = async () => {
+  if (ed.cells.some(c => !ed.sizes[c.p])) { toast('Still loading the photo…'); return; }
+  const round = c => ({ x: +c.x.toFixed(4), y: +c.y.toFixed(4), z: +c.z.toFixed(4) });
+  try {
+    if (ed.kind === 'photo') {
+      const name = ed.key;
+      if (ed.reset) {
+        await post('/api/frame', { name, reset: 1 });
+        meta[name] = Object.assign({}, meta[name]); delete meta[name].x; delete meta[name].y; delete meta[name].z;
+      } else {
+        const v = round(ed.cells[0]);
+        await post('/api/frame', Object.assign({ name }, v));
+        meta[name] = Object.assign({}, meta[name], v);
+      }
+    } else {
+      const body = { layout: ed.layout, off: ed.off, cells: ed.cells.map(c => Object.assign({ p: c.p }, round(c))) };
+      if (ed.key) body.id = ed.key;
+      await api('/api/combo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    }
+    const wasNew = ed.isNew;
+    toast(wasNew ? 'Combination added' : 'Saved');
+    leaveEditor();
+    if (wasNew) setSelecting(false);
+    load();
+  } catch (e) { quiet(e); }
+};
+$('edshow').onchange = async e => {
+  const on = e.target.checked, photo = ed.kind === 'photo';
+  try {
+    await setShown(photo ? [ed.key] : [], photo ? [] : [ed.key], on);
+    ed.off = !on; render();
+    toast(on ? 'Showing on the TV' : 'Hidden from the TV. Still stored there.');
+  } catch (err) { e.target.checked = !on; quiet(err); }
+};
+$('eddelete').onclick = async () => {
+  const photo = ed.kind === 'photo', key = ed.key;
+  if (await removeItems(photo ? [key] : [], photo ? [] : [key])) leaveEditor();
+};
+$('edclose').onclick = () => { if (ed && ed.dirty && !confirm('Close without saving?')) return; leaveEditor(); };
+function leaveEditor() { if (history.state && history.state.editor) history.back(); else closeEditor(); }
+function closeEditor() { ed = null; pts.clear(); $('editor').classList.remove('show'); $('stage').replaceChildren(); }
+window.addEventListener('popstate', () => { if (ed) closeEditor(); });
+window.addEventListener('resize', () => draw());
+
+// ---- Uploading ----
+// Shrink on the phone first: a 12 MP photo becomes ~400 KB, so uploads are quick on Wi-Fi.
+// The TV also resizes, so a picture the browser cannot read (HEIC on some phones) is sent as it is.
+async function shrink(file) {
+  try {
+    const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const s = Math.min(1, 1920 / bmp.width, 1080 / bmp.height);
+    const w = Math.round(bmp.width * s), h = Math.round(bmp.height * s);
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    c.getContext('2d').drawImage(bmp, 0, 0, w, h);
+    if (bmp.close) bmp.close();
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9));
+    if (blob && blob.size > 0) return blob;
+  } catch (e) {}
+  return file;
+}
+$('files').onchange = async e => {
+  const files = [...e.target.files]; e.target.value = '';
+  if (!files.length) return;
+  const into = current(); // photos added while a playlist is open go straight into it
+  const st = $('status'); st.classList.add('show');
+  let done = 0, failed = 0, lastErr = '';
+  for (const f of files) {
+    $('statustext').textContent = 'Sending ' + (done + failed + 1) + ' of ' + files.length + ' to the TV…';
+    $('bar').style.width = ((done + failed) / files.length * 100) + '%';
+    try {
+      const blob = await shrink(f);
+      await api('/api/upload?name=' + encodeURIComponent(f.name) + (into ? '&playlist=' + into.id : ''), { method: 'POST',
+        headers: { 'Content-Type': blob.type || 'application/octet-stream' }, body: blob });
+      done++;
+    } catch (err) {
+      if (err.message === 'PIN needed') { st.classList.remove('show'); return; }
+      failed++; lastErr = err.message;
+    }
+  }
+  $('bar').style.width = '100%';
+  setTimeout(() => st.classList.remove('show'), 600);
+  toast(failed ? ('Added ' + done + ', ' + failed + ' failed: ' + lastErr)
+    : ('Added ' + done + (done === 1 ? ' photo' : ' photos') + (into ? ' to ' + into.name : '')));
+  load();
+};
+
+// ---- Settings ----
+async function save(body) {
+  try { await api('/api/settings', { method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+    toast('Saved. Applies the next time the screensaver starts.');
+  } catch (e) { if (e.message !== 'PIN needed') toast(e.message); }
+}
+$('interval').onchange = e => save('interval=' + e.target.value);
+$('clock').onchange = e => save('clock=' + (e.target.checked ? 1 : 0));
+$('fill').onchange = e => save('fill=' + (e.target.checked ? 1 : 0));
+$('qr').onchange = e => save('qr=' + (e.target.checked ? 1 : 0));
+
+// ---- PIN: one PIN, never shown except right after a new random one ----
+async function changePin(body) {
+  return api('/api/pin', { method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+}
+$('savepin').onclick = async () => {
+  const p = $('pinval').value.replace(/\D/g, '');
+  if (p.length !== 4) { toast('The PIN has 4 digits.'); return; }
+  try { await changePin('pin=' + p); $('pinval').value = ''; $('shown').hidden = true; toast('PIN changed'); }
+  catch (e) { if (e.message !== 'PIN needed') toast(e.message); }
+};
+$('randompin').onclick = async () => {
+  if (!confirm('Make a new random PIN? Every other phone will need to enter it.')) return;
+  try { const r = await changePin('random=1'); $('shownpin').textContent = r.pin; $('shown').hidden = false; }
+  catch (e) { if (e.message !== 'PIN needed') toast(e.message); }
+};
+
+// ---- Weather town ----
+$('weather').onchange = async e => {
+  try { await api('/api/weather', { method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'on=' + (e.target.checked ? 1 : 0) });
+    toast('Saved. Applies the next time the screensaver starts.');
+  } catch (err) { if (err.message !== 'PIN needed') toast(err.message); }
+};
+async function searchPlace() {
+  const q = $('placeq').value.trim();
+  if (q.length < 2) { toast('Type a town name'); return; }
+  const box = $('placeresults'); box.replaceChildren();
+  try {
+    const r = await api('/api/places?q=' + encodeURIComponent(q));
+    if (!r.places.length) { toast('No town found with that name'); return; }
+    for (const p of r.places) {
+      const b = document.createElement('button'); b.textContent = p.label;
+      b.onclick = async () => {
+        box.replaceChildren();
+        try {
+          const s = await api('/api/weather', { method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'name=' + encodeURIComponent(p.name) + '&lat=' + p.lat + '&lon=' + p.lon });
+          $('placename').textContent = 'Forecast for ' + s.place; $('placeq').value = '';
+          toast(s.now ? s.place + ': ' + s.now : 'Town saved');
+        } catch (err) { if (err.message !== 'PIN needed') toast(err.message); }
+      };
+      box.append(b);
+    }
+  } catch (err) { if (err.message !== 'PIN needed') toast(err.message); }
+}
+$('placesearch').onclick = searchPlace;
+$('placeq').addEventListener('keydown', e => { if (e.key === 'Enter') searchPlace(); });
+
+// ---- PIN ----
+async function login() {
+  const pin = $('pin').value.replace(/\D/g, '');
+  if (pin.length !== 4) { $('err').textContent = 'The PIN has 4 digits.'; return; }
+  try {
+    const r = await fetch('/api/login', { method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'pin=' + pin });
+    const b = await r.json().catch(() => ({}));
+    if (!r.ok) { $('err').textContent = b.error || 'That did not work.'; $('pin').value = ''; return; }
+    load();
+  } catch (e) { $('err').textContent = 'Cannot reach the TV. Is it on, and is this phone on the same Wi-Fi?'; }
+}
+$('go').onclick = login;
+$('pin').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+$('pin').addEventListener('input', e => { if (e.target.value.replace(/\D/g, '').length === 4) login(); });
+
+// ---- The remote (TV view only): arrows move to the nearest button in that direction, OK presses ----
+function focusFirstChip() { const c = $('chips').querySelector('button'); if (c) c.focus({ preventScroll: true }); }
+if (TV) {
+  document.body.classList.add('tv');
+  $('bar-select').append($('selbar')); // the Select actions sit at the top, one press of Up away
+  const FOCUSABLE = 'button:not([disabled]), select, input.text, input.pin, .switch input';
+  // A switch counts as its whole row, so Up and Down reach it even though it sits at the far right.
+  const box = el => (el.matches('.switch input') ? el.closest('.row') || el.parentElement : el).getBoundingClientRect();
+  const gap = (a1, a2, b1, b2) => Math.max(0, Math.max(a1, b1) - Math.min(a2, b2)); // 0 when they overlap
+  const candidates = () => {
+    const scope = $('sheet').hidden ? document : $('sheet');
+    return [...scope.querySelectorAll(FOCUSABLE)].filter(el => {
+      if (el.closest('[hidden]')) return false;
+      const r = box(el); return r.width > 0 && r.height > 0;
+    });
+  };
+  const focusEl = el => {
+    el.focus({ preventScroll: true });
+    if (!el.closest('header') && !el.closest('.sheet')) (el.closest('.switch') || el).scrollIntoView({ block: 'center', inline: 'nearest' });
+    else if (el.closest('.sheet')) el.scrollIntoView({ block: 'nearest' });
+  };
+  const move = dir => {
+    const list = candidates(), cur = document.activeElement;
+    if (!list.length) return;
+    if (!list.includes(cur)) { focusEl(list[0]); return; }
+    const a = box(cur), acx = (a.left + a.right) / 2, acy = (a.top + a.bottom) / 2;
+    let best = null, bestScore = Infinity;
+    for (const el of list) {
+      if (el === cur) continue;
+      const b = box(el), bcx = (b.left + b.right) / 2, bcy = (b.top + b.bottom) / 2;
+      let along, across, centre;
+      if (dir === 'ArrowDown') { if (b.top < a.bottom - 4) continue; along = b.top - a.bottom; across = gap(a.left, a.right, b.left, b.right); centre = Math.abs(bcx - acx); }
+      else if (dir === 'ArrowUp') { if (b.bottom > a.top + 4) continue; along = a.top - b.bottom; across = gap(a.left, a.right, b.left, b.right); centre = Math.abs(bcx - acx); }
+      else if (dir === 'ArrowRight') { if (b.left < a.right - 4) continue; along = b.left - a.right; across = gap(a.top, a.bottom, b.top, b.bottom); centre = Math.abs(bcy - acy); }
+      else { if (b.right > a.left + 4) continue; along = a.left - b.right; across = gap(a.top, a.bottom, b.top, b.bottom); centre = Math.abs(bcy - acy); }
+      const score = Math.max(0, along) + across * 3 + centre * 0.05;
+      if (score < bestScore) { bestScore = score; best = el; }
+    }
+    if (best) focusEl(best);
+  };
+  document.addEventListener('keydown', e => {
+    const el = document.activeElement;
+    if (e.key.startsWith('Arrow')) {
+      if (el && el.matches('input.text, input.pin') && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) return; // the caret
+      e.preventDefault(); move(e.key);
+    } else if (e.key === 'Enter' && el && el.matches('.switch input')) {
+      e.preventDefault(); el.click(); // OK flips a switch
+    }
+  });
+  /** The TV app's Back: close what is open; false when there is nothing left, so the app leaves. */
+  window.tvBack = () => {
+    if (!$('sheet').hidden) { closeSheet(); return true; }
+    if (selecting) { setSelecting(false); return true; }
+    if (view) { showView(null); focusFirstChip(); return true; }
+    return false;
+  };
+}
+
+load();
+</script>
+</body>
+</html>
